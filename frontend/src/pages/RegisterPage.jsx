@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { Renderer, Camera, Transform, Program, Mesh, Plane } from 'ogl';
 
-// The PrismCanvas component will provide the animated background
+// The PrismCanvas component provides the animated background
 const PrismCanvas = () => {
     const canvasRef = useRef(null);
 
@@ -104,7 +104,6 @@ const PrismCanvas = () => {
     return <canvas ref={canvasRef} className="absolute top-0 left-0 w-full h-full z-0 opacity-25" />;
 };
 
-
 const RegisterPage = () => {
     const [formData, setFormData] = useState({
         email: '',
@@ -125,6 +124,11 @@ const RegisterPage = () => {
     return (
         <div className="min-h-screen w-full bg-black font-sans text-white overflow-hidden isolate flex items-center justify-center p-4">
             <PrismCanvas />
+
+            <header className="absolute top-0 left-0 w-full z-20 p-4 sm:p-6 lg:p-8">
+                <Link to="/" className="text-2xl font-bold hover:text-red-400 transition-colors">FinVista</Link>
+            </header>
+
             <div className="relative z-10 w-full max-w-md">
                 <div className="p-8 bg-black/30 rounded-2xl shadow-lg border border-white/10 backdrop-blur-lg">
                     <div className="text-center mb-8">
@@ -141,6 +145,7 @@ const RegisterPage = () => {
                                 onChange={handleChange}
                                 required
                                 className="w-full px-4 py-2 bg-gray-900/50 border border-white/10 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 transition-all"
+                                placeholder="you@example.com"
                             />
                         </div>
                         <div>
@@ -152,6 +157,7 @@ const RegisterPage = () => {
                                 onChange={handleChange}
                                 required
                                 className="w-full px-4 py-2 bg-gray-900/50 border border-white/10 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 transition-all"
+                                placeholder="••••••••"
                             />
                         </div>
                         <div>
@@ -163,11 +169,12 @@ const RegisterPage = () => {
                                 onChange={handleChange}
                                 required
                                 className="w-full px-4 py-2 bg-gray-900/50 border border-white/10 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 transition-all"
+                                placeholder="••••••••"
                             />
                         </div>
                         <button
                             type="submit"
-                            className="w-full mt-2 px-8 py-3 font-bold text-white bg-gradient-to-r from-red-600 to-red-800 rounded-md hover:opacity-90 transition-opacity"
+                            className="w-full pt-3 pb-3 mt-2 px-8 font-bold text-white bg-gradient-to-r from-red-600 to-red-800 rounded-md hover:opacity-90 transition-opacity"
                         >
                             Sign Up
                         </button>
@@ -184,12 +191,4 @@ const RegisterPage = () => {
     );
 };
 
-<p className="text-center text-gray-400 mt-8">
-    Already have an account?{' '}
-    <Link to="/login" className="font-medium text-red-500 hover:underline">
-        Login
-    </Link>
-</p>
-
 export default RegisterPage;
-
