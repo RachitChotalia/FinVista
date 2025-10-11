@@ -123,6 +123,9 @@ const RegisterPage = () => {
     };
 
     return (
+        <header className="absolute top-0 left-0 w-full z-20 p-4 sm:p-6 lg:p-8">
+                 <Link to="/" className="text-2xl font-bold hover:text-red-400 transition-colors">FinVista</Link>
+            </header>
         <div className="min-h-screen w-full bg-black font-sans text-white overflow-hidden isolate flex items-center justify-center p-4">
             <PrismCanvas />
             <div className="relative z-10 w-full max-w-md">
