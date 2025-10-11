@@ -1,16 +1,8 @@
 import React, { useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Renderer, Camera, Transform, Program, Mesh, Plane } from 'ogl';
-import { Link, useNavigate } from 'react-router-dom';
 
 
-const navigate = useNavigate();
-const handleLogin = (e) => {
-  e.preventDefault();
-  // For now, we'll just redirect to the dashboard.
-  console.log("Login form submitted, redirecting...");
-  navigate('/dashboard');
-};
 const PrismCanvas = () => {
     const canvasRef = useRef(null);
 

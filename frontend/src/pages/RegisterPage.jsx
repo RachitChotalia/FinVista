@@ -1,15 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { Renderer, Camera, Transform, Program, Mesh, Plane } from 'ogl';
-import { Link, useNavigate } from 'react-router-dom';
 
-const navigate = useNavigate();
-const handleSignup = (e) => {
-  e.preventDefault();
-  // For now, we'll just redirect to the dashboard.
-  console.log("Signup form submitted, redirecting...");
-  navigate('/dashboard');
-};
 // The PrismCanvas component provides the animated background
 const PrismCanvas = () => {
     const canvasRef = useRef(null);
