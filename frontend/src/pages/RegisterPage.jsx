@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { Renderer, Camera, Transform, Program, Mesh, Plane } from 'ogl';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 
 const navigate = useNavigate();
 const handleSignup = (e) => {
