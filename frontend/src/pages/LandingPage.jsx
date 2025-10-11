@@ -4,7 +4,7 @@ import { Renderer, Camera, Transform, Program, Mesh, Plane } from 'ogl';
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Filler, Legend } from 'chart.js';
 import { Line } from 'react-chartjs-2';
 
-// Register Chart.js components
+
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Filler, Legend);
 
 
@@ -207,7 +207,6 @@ const GrowthChart = () => {
 };
 
 
-// --- Main Landing Page Component ---
 const LandingPage = () => {
     return (
         <div className="min-h-screen w-full bg-black font-sans text-white overflow-hidden isolate">
@@ -226,7 +225,7 @@ const LandingPage = () => {
                         {/* Left Column: Text Content */}
                         <div className="text-center lg:text-left">
                             <h2 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight">
-                                <span className="bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-400">
+                                <span className="bg-clip-text text-white ">
                                     Intelligent Retirement Planning,
                                 </span>
                                 <span className="block mt-2 from-red-400 via-red-500 to-red-600 bg-gradient-to-r bg-clip-text text-transparent">Powered by AI.</span>
