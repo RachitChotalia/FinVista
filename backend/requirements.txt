@@ -10,3 +10,4 @@ python-multipart   # For form data handling
 email-validator
 google-generativeai
 python-dotenv
+bcrypt==4.0.1
