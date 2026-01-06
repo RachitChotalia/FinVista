@@ -36,7 +36,7 @@ users_collection = db.users
 # --- CORS ---
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"], 
+    allow_origins=["https://fin-vista-nine.vercel.app"], 
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -106,13 +106,16 @@ def fetch_live_market_data():
             live_data[name] = {"price": "Error", "pct": "0.00%", "isUp": True}
     return live_data
 
-# --- ROBUST AI CALL WITH AUTO-DISCOVERY ---
+# --- ROBUST AI CALL WITH FALLBACK ---
 def call_gemini_api(prompt):
     if not GEMINI_API_KEY:
         raise Exception("GEMINI_API_KEY not found")
         
-    # We use v1beta as it has broader model support for free tier
-    base_url = "https://generativelanguage.googleapis.com/v1beta/models"
+    # List of models to try in order (Production v1 endpoint)
+    # 1. Flash (Fastest)
+    # 2. Pro (Most Stable/Available)
+    models = ["gemini-1.5-flash", "gemini-pro"]
+    
     headers = {'Content-Type': 'application/json'}
     payload = {
         "contents": [{
@@ -120,76 +123,29 @@ def call_gemini_api(prompt):
         }]
     }
 
-    # 1. First, try the standard model directly (Fast Path)
-    try:
-        url = f"{base_url}/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
-        response = requests.post(url, headers=headers, json=payload)
-        if response.status_code == 200:
-            return response.json()
-        # If it fails (404/400), we silently fall through to Auto-Discovery
-    except:
-        pass
-
-    # 2. Auto-Discovery: Ask Google what models this key CAN access
-    print("Standard model failed. Auto-discovering available models...")
-    try:
-        list_url = f"{base_url}?key={GEMINI_API_KEY}"
-        list_response = requests.get(list_url)
-        
-        if list_response.status_code != 200:
-            raise Exception(f"Failed to list models: {list_response.text}")
-        
-        data = list_response.json()
-        available_models = data.get('models', [])
-        
-        # Filter for models that support 'generateContent'
-        valid_models = [
-            m['name'].replace('models/', '') 
-            for m in available_models 
-            if 'generateContent' in m.get('supportedGenerationMethods', [])
-        ]
-        
-        if not valid_models:
-            raise Exception("No generative models found for this API Key.")
-            
-        # Prioritize: 1.5-flash -> 1.5-pro -> others
-        # We sort them so the 'best' ones are at the top of the list
-        def priority_sort(name):
-            if '1.5-flash' in name: return 0
-            if '1.5-pro' in name: return 1
-            if 'flash' in name: return 2
-            return 3
-            
-        valid_models.sort(key=priority_sort)
-        print(f"Found valid models: {valid_models}")
-
-    except Exception as e:
-        raise Exception(f"Auto-discovery failed: {e}")
-
-    # 3. Try the valid models one by one
     last_error = None
-    for model_name in valid_models:
+
+    for model in models:
         try:
-            print(f"Trying fallback model: {model_name}...")
-            url = f"{base_url}/{model_name}:generateContent?key={GEMINI_API_KEY}"
+            # Note: Using 'v1' endpoint now, not 'v1beta'
+            url = f"https://generativelanguage.googleapis.com/v1/models/{model}:generateContent?key={GEMINI_API_KEY}"
+            
+            print(f"Trying AI Model: {model}...")
             response = requests.post(url, headers=headers, json=payload)
             
             if response.status_code == 200:
-                print(f"Success with {model_name}")
                 return response.json()
-            elif response.status_code == 429:
-                 print(f"Model {model_name} hit rate limit.")
-                 last_error = "Rate Limit Exceeded"
-                 continue
             else:
+                print(f"Model {model} failed with status {response.status_code}: {response.text}")
                 last_error = response.text
-                continue
-                
+                continue # Try next model
+
         except Exception as e:
+            print(f"Exception calling {model}: {e}")
             last_error = str(e)
             continue
 
-    raise Exception(f"All available models failed. Last error: {last_error}")
+    raise Exception(f"All AI models failed. Last error: {last_error}")
 
 # --- DEPENDENCIES ---
 async def get_current_user(token: str = Depends(oauth2_scheme)):
@@ -286,10 +242,10 @@ async def analyze_portfolio(req: InsightRequest, current_user: dict = Depends(ge
     """
     
     try:
-        # CALL WITH AUTO-DISCOVERY
+        # CALL DIRECT API
         api_data = await asyncio.to_thread(call_gemini_api, prompt)
         
-        # Parse Response
+        # Parse Response safely
         try:
             raw_text = api_data['candidates'][0]['content']['parts'][0]['text']
             clean_json = raw_text.replace("```json", "").replace("```", "").strip()
