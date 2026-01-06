@@ -1,0 +1,11 @@
+fastapi
+uvicorn
+numpy
+yfinance
+pydantic
+motor              # Async MongoDB driver
+passlib[bcrypt]    # Password hashing
+python-jose[cryptography] # JWT token generation
+python-multipart   # For form data handling
+email-validator
+google-generativeai

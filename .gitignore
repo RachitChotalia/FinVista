@@ -1,0 +1,43 @@
+# --- General ---
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.log
+
+# --- Backend (Python) ---
+backend/__pycache__/
+backend/*.py[cod]
+backend/venv/
+backend/.env
+backend/.pytest_cache/
+backend/requirements.txt.bak
+
+# Python specific
+*.egg-info/
+.coverage
+htmlcov/
+
+# --- Frontend (React/Node) ---
+frontend/node_modules/
+frontend/dist/
+frontend/.env
+frontend/.env.local
+frontend/.env.development.local
+frontend/.env.test.local
+frontend/.env.production.local
+frontend/npm-debug.log*
+frontend/yarn-debug.log*
+frontend/yarn-error.log*
+frontend/package-lock.json # Optional: Keep this if you want version consistency, ignore if you want flexibility. usually KEEP IT.
+
+# --- Database ---
+# If you run local mongodb data inside the project
+backend/data/db/
+dump/
+
+# --- Environment Variables (CRITICAL) ---
+# Never commit keys
+.env
+.env.*
+!.env.example

@@ -1,194 +1,124 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Link } from 'react-router-dom';
-import { Renderer, Camera, Transform, Program, Mesh, Plane } from 'ogl';
-
-// The PrismCanvas component provides the animated background
-const PrismCanvas = () => {
-    const canvasRef = useRef(null);
-
-    useEffect(() => {
-        const canvas = canvasRef.current;
-        const renderer = new Renderer({ canvas, dpr: 2, alpha: true, antialias: true });
-        const gl = renderer.gl;
-        gl.clearColor(0, 0, 0, 0);
-
-        const camera = new Camera(gl, { fov: 15 });
-        camera.position.z = 15;
-
-        const resize = () => {
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            camera.perspective({ aspect: gl.canvas.width / gl.canvas.height });
-        };
-        window.addEventListener('resize', resize, false);
-        resize();
-
-        const scene = new Transform();
-        const geometry = new Plane(gl, { width: 20, height: 12 });
-
-        const mouse = { x: 0, y: 0 };
-        const handleMouseMove = (e) => {
-            mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
-            mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
-        };
-        window.addEventListener('mousemove', handleMouseMove);
-
-        const vertex = `
-            attribute vec2 uv;
-            attribute vec3 position;
-            uniform mat4 modelViewMatrix;
-            uniform mat4 projectionMatrix;
-            varying vec2 vUv;
-            void main() {
-                vUv = uv;
-                gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-            }
-        `;
-
-        const fragment = `
-            precision highp float;
-            uniform float uTime;
-            uniform vec2 uMouse;
-            varying vec2 vUv;
-
-            float random(vec2 st) {
-                return fract(sin(dot(st.xy, vec2(12.9898, 78.233))) * 43758.5453123);
-            }
-
-            void main() {
-                vec2 p = vUv - 0.5;
-                p += uMouse * 0.1;
-
-                float t = uTime * 0.1;
-                float r_disp = sin(t * 0.7 + random(p) * 2.0) * 0.1;
-                float g_disp = cos(t * 0.5 + random(p + 0.1) * 2.0) * 0.15;
-                float b_disp = sin(t * 0.6 + random(p + 0.2) * 2.0) * 0.2;
-
-                vec3 color = vec3(
-                    sin(length(p + r_disp) * 10.0 - t * 2.5),
-                    cos(length(p + g_disp) * 12.0 - t * 2.0),
-                    sin(length(p + b_disp) * 14.0 - t * 3.0)
-                );
-
-                color = normalize(abs(color));
-                float vignette = 1.0 - length(vUv - 0.5) * 0.8;
-                color *= vignette;
-                gl_FragColor = vec4(color, 1.0);
-            }
-        `;
-
-        const program = new Program(gl, {
-            vertex,
-            fragment,
-            uniforms: { uTime: { value: 0 }, uMouse: { value: [0, 0] } },
-        });
-
-        const mesh = new Mesh(gl, { geometry, program });
-        mesh.setParent(scene);
-
-        let animationFrameId;
-        const update = (t) => {
-            program.uniforms.uTime.value = t * 0.001;
-            program.uniforms.uMouse.value = [mouse.x, mouse.y];
-            renderer.render({ scene, camera });
-            animationFrameId = requestAnimationFrame(update);
-        };
-        animationFrameId = requestAnimationFrame(update);
-
-        return () => {
-            window.removeEventListener('resize', resize);
-            window.removeEventListener('mousemove', handleMouseMove);
-            cancelAnimationFrame(animationFrameId);
-        };
-    }, []);
-
-    return <canvas ref={canvasRef} className="absolute top-0 left-0 w-full h-full z-0 opacity-25" />;
-};
+import React, { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { FaArrowLeft, FaExclamationCircle } from 'react-icons/fa';
+import { registerUser } from '../api';
 
 const RegisterPage = () => {
-    const [formData, setFormData] = useState({
-        email: '',
-        password: '',
-        confirmPassword: ''
-    });
+    const navigate = useNavigate();
+    const [formData, setFormData] = useState({ name: '', email: '', password: '', confirmPassword: '' });
+    const [error, setError] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
 
-    const handleChange = (e) => {
-        setFormData({ ...formData, [e.target.name]: e.target.value });
-    };
+    const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
 
-    const handleSubmit = (e) => {
+    const handleRegister = async (e) => {
         e.preventDefault();
-        // Placeholder for registration logic
-        console.log('Form submitted', formData);
+        setError('');
+
+        if (formData.password !== formData.confirmPassword) {
+            setError("KEYPHRASES DO NOT MATCH");
+            return;
+        }
+
+        setIsLoading(true);
+        try {
+            await registerUser(formData.name, formData.email, formData.password);
+            navigate('/dashboard');
+        } catch (err) {
+            setError(err.detail || "Registration Failed");
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     return (
-        <div className="min-h-screen w-full bg-black font-sans text-white overflow-hidden isolate flex items-center justify-center p-4">
-            <PrismCanvas />
+        <div className="min-h-screen w-full bg-[#F5F5F0] bg-grid flex items-center justify-center p-6 relative">
+            <Link to="/" className="absolute top-6 left-6 flex items-center gap-2 font-mono text-xs font-bold uppercase hover:text-[#FF3B00] transition-colors">
+                <FaArrowLeft /> Back to Index
+            </Link>
 
-            <header className="absolute top-0 left-0 w-full z-20 p-4 sm:p-6 lg:p-8">
-                <Link to="/" className="text-2xl font-bold hover:text-red-400 transition-colors">FinVista</Link>
-            </header>
+            <div className="w-full max-w-md bg-white border border-black shadow-[8px_8px_0px_#000]">
+                <div className="bg-[#FF3B00] text-white p-6 border-b border-black">
+                    <h2 className="font-serif text-2xl italic">New Entry</h2>
+                    <p className="font-mono text-xs mt-1 opacity-90">INITIALIZE_USER_PROTOCOL_V1</p>
+                </div>
 
-            <div className="relative z-10 w-full max-w-md">
-                <div className="p-8 bg-black/30 rounded-2xl shadow-lg border border-white/10 backdrop-blur-lg">
-                    <div className="text-center mb-8">
-                        <h1 className="text-3xl font-bold">Create Account</h1>
-                        <p className="text-gray-400 mt-2">Join FinVista and plan your future.</p>
-                    </div>
-                    <form onSubmit={handleSubmit} className="space-y-6">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-400 mb-2">Email Address</label>
-                            <input
-                                type="email"
-                                name="email"
-                                value={formData.email}
-                                onChange={handleChange}
-                                required
-                                className="w-full px-4 py-2 bg-gray-900/50 border border-white/10 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 transition-all"
-                                placeholder="you@example.com"
-                            />
+                <div className="p-8">
+                    {error && (
+                        <div className="mb-6 bg-red-100 border border-red-500 text-red-700 px-4 py-3 text-xs font-mono flex items-center gap-2">
+                            <FaExclamationCircle /> {error}
                         </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-400 mb-2">Password</label>
-                            <input
-                                type="password"
-                                name="password"
-                                value={formData.password}
-                                onChange={handleChange}
-                                required
-                                className="w-full px-4 py-2 bg-gray-900/50 border border-white/10 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 transition-all"
-                                placeholder="••••••••"
-                            />
+                    )}
+                    
+                    <form onSubmit={handleRegister} className="space-y-5">
+                        <div className="space-y-2">
+                            <label className="text-xs font-bold uppercase tracking-widest font-mono">Full Designation</label>
+                            <input type="text" name="name" onChange={handleChange} required className="w-full bg-[#F5F5F0] border-b-2 border-black p-3 font-mono text-sm focus:bg-black/5 focus:border-[#FF3B00] outline-none" placeholder="JONATHAN DOE" />
                         </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-400 mb-2">Confirm Password</label>
-                            <input
-                                type="password"
-                                name="confirmPassword"
-                                value={formData.confirmPassword}
-                                onChange={handleChange}
-                                required
-                                className="w-full px-4 py-2 bg-gray-900/50 border border-white/10 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 transition-all"
-                                placeholder="••••••••"
-                            />
+                        <div className="space-y-2">
+                            <label className="text-xs font-bold uppercase tracking-widest font-mono">Digital Address</label>
+                            <input type="email" name="email" onChange={handleChange} required className="w-full bg-[#F5F5F0] border-b-2 border-black p-3 font-mono text-sm focus:bg-black/5 focus:border-[#FF3B00] outline-none" placeholder="USER@EXAMPLE.COM" />
                         </div>
-                        <button
-                            type="submit"
-                            className="w-full pt-3 pb-3 mt-2 px-8 font-bold text-white bg-gradient-to-r from-red-600 to-red-800 rounded-md hover:opacity-90 transition-opacity"
-                        >
-                            Sign Up
-                        </button>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <label className="text-xs font-bold uppercase tracking-widest font-mono">Set Key</label>
+                                <input type="password" name="password" onChange={handleChange} required className="w-full bg-[#F5F5F0] border-b-2 border-black p-3 font-mono text-sm focus:bg-black/5 focus:border-[#FF3B00] outline-none" placeholder="••••••" />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-xs font-bold uppercase tracking-widest font-mono">Confirm</label>
+                                <input type="password" name="confirmPassword" onChange={handleChange} required className="w-full bg-[#F5F5F0] border-b-2 border-black p-3 font-mono text-sm focus:bg-black/5 focus:border-[#FF3B00] outline-none" placeholder="••••••" />
+                            </div>
+                        </div>
+
+                        <div className="pt-6">
+                            <button type="submit" disabled={isLoading} className="w-full bg-black text-white py-4 font-bold uppercase tracking-widest text-xs border border-black hover:bg-white hover:text-black hover:shadow-[4px_4px_0px_#000] transition-all disabled:opacity-50">
+                                {isLoading ? "PROCESSING..." : "CREATE RECORD"}
+                            </button>
+                        </div>
                     </form>
-                    <p className="text-center text-gray-400 mt-8">
-                        Already have an account?{' '}
-                        <Link to="/login" className="font-medium text-red-500 hover:underline">
-                            Login
-                        </Link>
-                    </p>
+                    
+                    <div className="mt-8 pt-8 border-t border-dashed border-gray-400 text-center">
+                         <p className="font-mono text-xs text-gray-500 mb-2">EXISTING_ENTITY?</p>
+                         <Link to="/login" className="text-xs uppercase font-bold text-black border-b border-black hover:text-[#FF3B00] hover:border-[#FF3B00] transition-colors">
+                            Access Existing Ledger
+                         </Link>
+                    </div>
                 </div>
             </div>
         </div>
     );
 };
 
+// ... inside RegisterPage.jsx
+
+    const handleRegister = async (e) => {
+        e.preventDefault();
+        setError('');
+
+        if (formData.password !== formData.confirmPassword) {
+            setError("KEYPHRASES DO NOT MATCH");
+            return;
+        }
+
+        setIsLoading(true);
+        try {
+            await registerUser(formData.name, formData.email, formData.password);
+            navigate('/dashboard');
+        } catch (err) {
+            console.error("Registration Error:", err); // Log it for debugging
+            
+            // FIX: Check if the error is an Array (Validation Error) or a String
+            if (Array.isArray(err.detail)) {
+                // It's a validation error list (e.g. Password too short)
+                // Take the first error message from the list
+                setError(err.detail[0].msg); 
+            } else {
+                // It's a simple string error (e.g. "Email already registered")
+                setError(err.detail || "Registration Failed");
+            }
+        } finally {
+            setIsLoading(false);
+        }
+    };
+    
 export default RegisterPage;

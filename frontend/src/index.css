@@ -1,7 +1,64 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Playfair+Display:ital,wght@0,400;0,700;1,400&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Add this rule for testing */
+:root {
+  --bg-paper: #F5F5F0;
+  --ink: #111111;
+  --accent: #FF3B00; /* International Orange */
+  --border: #C8C8C0; /* Subtle border for the paper feel */
+}
 
+body {
+  background-color: var(--bg-paper);
+  color: var(--ink);
+  font-family: 'JetBrains Mono', monospace; /* Default to data font */
+  -webkit-font-smoothing: antialiased;
+}
 
+/* Serif Headings for that "Editorial" feel */
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Playfair Display', serif;
+  font-weight: 400;
+}
+
+/* The "Grid" Background */
+.bg-grid {
+  background-size: 40px 40px;
+  background-image:
+    linear-gradient(to right, #E0E0DB 1px, transparent 1px),
+    linear-gradient(to bottom, #E0E0DB 1px, transparent 1px);
+}
+
+/* Brutalist Button */
+.btn-brutal {
+  border: 1px solid var(--ink);
+  background: white;
+  color: var(--ink);
+  transition: all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 500;
+}
+
+.btn-brutal:hover {
+  background: var(--ink);
+  color: white;
+  transform: translate(-2px, -2px);
+  box-shadow: 4px 4px 0px var(--accent);
+}
+
+.btn-primary {
+  background: var(--ink);
+  color: white;
+  border: 1px solid var(--ink);
+}
+
+.btn-primary:hover {
+  background: var(--accent);
+  border-color: var(--accent);
+  transform: translate(-2px, -2px);
+  box-shadow: 4px 4px 0px var(--ink);
+}
