@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { FaArrowRight, FaChartLine, FaRobot, FaRupeeSign } from 'react-icons/fa'; // Updated Icon Import
+import { FaArrowRight, FaChartLine, FaRobot, FaRupeeSign } from 'react-icons/fa'; 
 
 const LandingPage = () => {
     // --- 1. State for Real-Time Data ---
@@ -11,9 +11,14 @@ const LandingPage = () => {
         "USD/INR": { price: "Loading...", pct: "...", isUp: false }, 
     });
 
-    // --- 2. WebSocket Connection ---
+    // --- 2. WebSocket Connection (DYNAMIC) ---
     useEffect(() => {
-        const ws = new WebSocket("ws://localhost:8000/ws/market");
+        // Get Base URL
+        const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000";
+        // Convert http/https to ws/wss and append route
+        const WS_URL = API_BASE.replace(/^http/, "ws") + "/ws/market";
+
+        const ws = new WebSocket(WS_URL);
 
         ws.onopen = () => console.log("Landing Page: Connected to Market Stream");
         

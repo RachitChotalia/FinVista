@@ -88,9 +88,14 @@ const DashboardPage = () => {
         loadUser();
     }, [navigate]);
 
-    // B. WebSocket Connection for Live Ticker
+    // B. WebSocket Connection for Live Ticker (DYNAMIC)
     useEffect(() => {
-        const ws = new WebSocket("ws://localhost:8000/ws/market");
+        // Get Base URL
+        const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000";
+        // Convert http/https to ws/wss and append route
+        const WS_URL = API_BASE.replace(/^http/, "ws") + "/ws/market";
+
+        const ws = new WebSocket(WS_URL);
 
         ws.onopen = () => console.log("Connected to Market Stream");
         

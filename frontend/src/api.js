@@ -1,6 +1,10 @@
 import axios from 'axios';
 
-const API_URL = 'http://localhost:8000/api';
+// 1. Get the base URL from Vite environment or default to localhost
+const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+
+// 2. Append '/api' because your backend routes are defined as /api/login, etc.
+const API_URL = `${BASE_URL}/api`;
 
 export const api = axios.create({
     baseURL: API_URL,
