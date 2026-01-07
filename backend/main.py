@@ -19,24 +19,16 @@ load_dotenv()
 # --- CONFIGURATION ---
 MONGO_URL = os.getenv("MONGO_URL", "mongodb://localhost:27017")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-SECRET_KEY = "YOUR_SUPER_SECRET_KEY_CHANGE_THIS_IN_PROD"
+SECRET_KEY = os.getenv("SECRET_KEY", "YOUR_SUPER_SECRET_KEY")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
 app = FastAPI(title="FinVista API")
 
-# --- 1. SETUP SECURITY & DB ---
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/login")
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
-client = AsyncIOMotorClient(MONGO_URL)
-db = client.finvista_db
-users_collection = db.users
-
-# --- CORS ---
+# --- CORS CONFIGURATION ---
 origins = [
-    "http://localhost:5173",                       
-    "https://fin-vista-nine.vercel.app"            
+    "http://localhost:5173",
+    "https://fin-vista-nine.vercel.app"  
 ]
 
 app.add_middleware(
@@ -46,6 +38,14 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# --- 1. SETUP SECURITY & DB ---
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/login")
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+client = AsyncIOMotorClient(MONGO_URL)
+db = client.finvista_db
+users_collection = db.users
 
 # --- MODELS ---
 class UserCreate(BaseModel):
@@ -87,11 +87,7 @@ def create_access_token(data: dict):
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 def fetch_live_market_data():
-    tickers = {
-        "NIFTY 50": "^NSEI",
-        "SENSEX": "^BSESN",
-        "USD/INR": "INR=X"
-    }
+    tickers = {"NIFTY 50": "^NSEI", "SENSEX": "^BSESN", "USD/INR": "INR=X"}
     live_data = {}
     for name, symbol in tickers.items():
         try:
@@ -101,52 +97,67 @@ def fetch_live_market_data():
             change = price - prev_close
             pct_change = (change / prev_close) * 100
             is_up = change >= 0
-            live_data[name] = {
-                "price": f"{price:,.2f}",
-                "pct": f"{pct_change:+.2f}%",
-                "isUp": is_up
-            }
-        except Exception as e:
-            print(f"Error fetching {name}: {e}")
+            live_data[name] = {"price": f"{price:,.2f}", "pct": f"{pct_change:+.2f}%", "isUp": is_up}
+        except:
             live_data[name] = {"price": "Error", "pct": "0.00%", "isUp": True}
     return live_data
 
-# --- ROBUST AI CALL WITH FALLBACK ---
+# --- ROBUST AI CALL WITH AUTO-DISCOVERY (v1beta) ---
 def call_gemini_api(prompt):
     if not GEMINI_API_KEY:
         raise Exception("GEMINI_API_KEY not found")
         
-    # List of models to try in order (Production v1 endpoint)
-    # 1. Flash (Fastest)
-    # 2. Pro (Most Stable/Available)
-    models = ["gemini-1.5-flash", "gemini-pro"]
-    
+    # Use v1beta (It supports more models for free tier)
+    base_url = "https://generativelanguage.googleapis.com/v1beta/models"
     headers = {'Content-Type': 'application/json'}
-    payload = {
-        "contents": [{
-            "parts": [{"text": prompt}]
-        }]
-    }
+    payload = {"contents": [{"parts": [{"text": prompt}]}]}
 
-    last_error = None
-
-    for model in models:
-        try:
-            # Note: Using 'v1' endpoint now, not 'v1beta'
-            url = f"https://generativelanguage.googleapis.com/v1/models/{model}:generateContent?key={GEMINI_API_KEY}"
+    # 1. AUTO-DISCOVERY: Ask Google what models you have access to
+    print("Auto-discovering available AI models...")
+    valid_models = []
+    try:
+        list_url = f"{base_url}?key={GEMINI_API_KEY}"
+        list_response = requests.get(list_url)
+        
+        if list_response.status_code == 200:
+            data = list_response.json()
+            # Filter for models that support generating content
+            valid_models = [
+                m['name'].replace('models/', '') 
+                for m in data.get('models', []) 
+                if 'generateContent' in m.get('supportedGenerationMethods', [])
+            ]
             
-            print(f"Trying AI Model: {model}...")
+            # Sort preference: 1.5-flash -> 1.5-pro -> standard pro
+            def priority(name):
+                if '1.5-flash' in name: return 0
+                if '1.5-pro' in name: return 1
+                return 2
+            valid_models.sort(key=priority)
+            print(f"Discovered Valid Models: {valid_models}")
+    except Exception as e:
+        print(f"Discovery failed: {e}")
+
+    # Fallback list if discovery fails completely
+    if not valid_models:
+        valid_models = ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-pro"]
+
+    # 2. Try models one by one
+    last_error = None
+    for model_name in valid_models:
+        try:
+            print(f"Attempting generation with: {model_name}...")
+            url = f"{base_url}/{model_name}:generateContent?key={GEMINI_API_KEY}"
             response = requests.post(url, headers=headers, json=payload)
             
             if response.status_code == 200:
+                print(f"Success with {model_name}")
                 return response.json()
             else:
-                print(f"Model {model} failed with status {response.status_code}: {response.text}")
+                print(f"Model {model_name} failed: {response.status_code} - {response.text}")
                 last_error = response.text
-                continue # Try next model
-
+                continue
         except Exception as e:
-            print(f"Exception calling {model}: {e}")
             last_error = str(e)
             continue
 
@@ -157,28 +168,24 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         email: str = payload.get("sub")
-        if email is None:
-            raise HTTPException(status_code=401, detail="Invalid token")
-    except JWTError:
-        raise HTTPException(status_code=401, detail="Invalid token")
+        if email is None: raise HTTPException(401, "Invalid token")
+    except JWTError: raise HTTPException(401, "Invalid token")
     
     user = await users_collection.find_one({"email": email})
-    if user is None:
-        raise HTTPException(status_code=401, detail="User not found")
+    if user is None: raise HTTPException(401, "User not found")
     
-    return {
-        "id": str(user["_id"]),
-        "name": user["name"],
-        "email": user["email"]
-    }
+    return {"id": str(user["_id"]), "name": user["name"], "email": user["email"]}
 
 # --- ROUTES ---
+
+@app.get("/")
+def health_check():
+    return {"status": "online", "service": "FinVista Backend"}
 
 @app.post("/api/register", response_model=Token)
 async def register(user: UserCreate):
     existing = await users_collection.find_one({"email": user.email})
     if existing: raise HTTPException(400, "Email already registered")
-    
     hashed = get_password_hash(user.password)
     await users_collection.insert_one({"name": user.name, "email": user.email, "password": hashed})
     return {"access_token": create_access_token({"sub": user.email}), "token_type": "bearer"}
@@ -204,18 +211,15 @@ async def get_projection(req: ProjectionRequest, current_user: dict = Depends(ge
     returns = np.random.normal(mu/12, sigma/np.sqrt(12), (1000, months))
     values = np.zeros((1000, months + 1))
     values[:, 0] = req.current_savings
-    
     total_invested = req.current_savings + (req.monthly_savings * months)
 
     for t in range(1, months + 1):
         values[:, t] = values[:, t-1] * (1 + returns[:, t-1]) + req.monthly_savings
         
-    final_values = values[:, -1]
-    success_count = np.count_nonzero(final_values > total_invested)
+    success_count = np.count_nonzero(values[:, -1] > total_invested)
     success_probability = round((success_count / 1000) * 100, 1)
 
     labels = [str(2025 + i//12) for i in range(0, months+1, 12)]
-    
     return {
         "labels": labels,
         "data_optimistic": [round(x/100000, 2) for x in np.percentile(values, 90, axis=0)[::12]],
@@ -227,43 +231,26 @@ async def get_projection(req: ProjectionRequest, current_user: dict = Depends(ge
 @app.post("/api/analyze")
 async def analyze_portfolio(req: InsightRequest, current_user: dict = Depends(get_current_user)):
     duration = req.retirement_age - req.current_age
-
     prompt = f"""
     Act as an Indian Financial Advisor.
     User Profile:
-    - Age: {req.current_age}
-    - Investment Horizon: {duration} Years (Retiring at {req.retirement_age})
-    - Monthly SIP: ₹{req.monthly_savings}
-    - Risk Tolerance: {req.risk_tolerance}
-    - Market Trend: {req.market_trend}
+    - Age: {req.current_age}, Horizon: {duration} Years
+    - SIP: ₹{req.monthly_savings}, Risk: {req.risk_tolerance}, Market: {req.market_trend}
 
-    Based on this, return a strict JSON object (no markdown) with these keys:
-    - risk_title (Max 5 words)
-    - risk_desc (Max 20 words, specific to the duration/risk)
-    - strategy_title (Max 5 words, e.g. "Mid-Cap Momentum", "Debt Heavy")
-    - strategy_desc (Max 20 words, suggesting asset allocation)
-    - macro_title (Max 5 words, e.g. "Bull Market Rally", "Inflationary Pressure")
-    - macro_desc (Max 20 words, tailored to Indian context)
+    Return STRICT JSON with keys:
+    - risk_title (Max 5 words), risk_desc (Max 20 words)
+    - strategy_title (Max 5 words), strategy_desc (Max 20 words)
+    - macro_title (Max 5 words), macro_desc (Max 20 words)
     """
-    
     try:
-        # CALL DIRECT API
         api_data = await asyncio.to_thread(call_gemini_api, prompt)
-        
-        # Parse Response safely
-        try:
-            raw_text = api_data['candidates'][0]['content']['parts'][0]['text']
-            clean_json = raw_text.replace("```json", "").replace("```", "").strip()
-            return json.loads(clean_json)
-        except (KeyError, IndexError, json.JSONDecodeError):
-            print("Failed to parse AI response structure.")
-            return {"risk_title": "Parsing Error", "risk_desc": "AI response was invalid.", "strategy_title": "N/A", "strategy_desc": "N/A", "macro_title": "N/A", "macro_desc": "N/A"}
-
+        raw_text = api_data['candidates'][0]['content']['parts'][0]['text']
+        clean_json = raw_text.replace("```json", "").replace("```", "").strip()
+        return json.loads(clean_json)
     except Exception as e:
         print(f"Final AI Error: {e}")
-        return {"risk_title": "Service Unavailable", "risk_desc": "Please try again later.", "strategy_title": "Hold", "strategy_desc": "Keep investing", "macro_title": "N/A", "macro_desc": "N/A"}
+        return {"risk_title": "Analysis Failed", "risk_desc": "Service unavailable.", "strategy_title": "N/A", "strategy_desc": "N/A", "macro_title": "N/A", "macro_desc": "N/A"}
 
-# --- WEBSOCKET ---
 @app.websocket("/ws/market")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
@@ -272,8 +259,8 @@ async def websocket_endpoint(websocket: WebSocket):
             data = await asyncio.to_thread(fetch_live_market_data)
             await websocket.send_json(data)
             await asyncio.sleep(3)
-    except Exception as e:
-        print(f"WebSocket disconnected: {e}")
+    except:
+        print("WebSocket disconnected")
 
 if __name__ == "__main__":
     import uvicorn
